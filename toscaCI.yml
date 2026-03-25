@@ -1,0 +1,122 @@
+############################################
+# CONFIG (Azure DevOps variables are used)
+############################################
+$CLIENT_ID = "Tricentis_Cloud_API"
+$CLIENT_SECRET    = "qWofWKsmVxN_Cpp2nVxdiBIBO2-f49IEA2hubs3mQiNUWpnrTrTdG0Ferj74JZR0"
+$E2G_SCOPE        = "tta"
+$E2G_AUTH_URL     = "https://presales.okta.com/oauth2/default/v1/token"
+$TOSCA_CLOUD_URL  = "https://presales.my.tricentis.com/94fdbfd3-30fd-4487-bbf1-414a26c598a6"
+$PLAYLIST_ID      = "d178d698-e915-49cc-b13f-cfc5589ca30a"
+############################################
+# GET ACCESS TOKEN
+############################################
+Write-Host "=== TOKEN ACQUISITION ==="
+$headers = @{
+    "Content-Type" = "application/x-www-form-urlencoded"
+}
+$body = "client_id=$CLIENT_ID&client_secret=$CLIENT_SECRET&scope=$E2G_SCOPE&grant_type=client_credentials"
+$maxRetries = 3
+$retryCount = 0
+$success = $false
+do {
+    try {
+        $response = Invoke-RestMethod -Uri $E2G_AUTH_URL -Method Post -Headers $headers -Body $body
+        $accessToken = $response.access_token
+        $success = $true
+        Write-Host "Token acquired successfully"
+    }
+    catch {
+        $retryCount++
+        Write-Host "Token attempt $retryCount failed: $($_.Exception.Message)"
+        Start-Sleep -Seconds 5
+    }
+} while (-not $success -and $retryCount -lt $maxRetries)
+if (-not $success) {
+    throw "Failed to acquire token"
+}
+############################################
+# START PLAYLIST EXECUTION
+############################################
+Write-Host "=== STARTING PLAYLIST ==="
+$headers = @{
+    "Authorization" = "Bearer $accessToken"
+    "Content-Type"  = "application/json"
+    "Accept"        = "application/json"
+}
+$body = @{
+    playlistId = $PLAYLIST_ID
+    private    = $false
+} | ConvertTo-Json
+$runUrl = "$TOSCA_CLOUD_URL/_playlists/api/v2/playlistRuns/"
+$response = Invoke-RestMethod -Uri $runUrl -Method Post -Headers $headers -Body $body
+if ($response.executionId) {
+    $executionId = $response.executionId
+} elseif ($response.id) {
+    $executionId = $response.id
+} else {
+    throw "No execution ID returned"
+}
+Write-Host "Execution ID: $executionId"
+############################################
+# WAIT FOR EXECUTION TO FINISH
+############################################
+Write-Host "=== WAITING FOR EXECUTION ==="
+$timeoutMinutes = 120
+$pollInterval   = 30
+$timeoutTime    = (Get-Date).AddMinutes($timeoutMinutes)
+do {
+    $statusUrl = "$TOSCA_CLOUD_URL/_playlists/api/v2/playlistRuns/$executionId"
+    $response  = Invoke-RestMethod -Uri $statusUrl -Method Get -Headers $headers
+    $status    = $response.state
+    Write-Host "Current state: $status"
+    if ($status -in @("Completed","Succeeded")) {
+        Write-Host "Execution succeeded"
+        break
+    }
+    if ($status -eq "Failed") {
+        throw "Execution failed"
+    }
+    if ($status -in @("Canceled","Cancelled","Canceling")) {
+        throw "Execution canceled"
+    }
+    if ((Get-Date) -gt $timeoutTime) {
+        throw "Execution timed out"
+    }
+    Start-Sleep -Seconds $pollInterval
+} while ($true)
+############################################
+# GET JUNIT RESULTS
+############################################
+Write-Host "=== FETCHING JUNIT RESULTS ==="
+$headers = @{
+    "Authorization" = "Bearer $accessToken"
+    "Accept"        = "application/xml"
+}
+$junitUrl = "$TOSCA_CLOUD_URL/_playlists/api/v2/playlistRuns/$executionId/junit"
+$junitResponse = Invoke-RestMethod -Uri $junitUrl -Method Get -Headers $headers
+$junitXml = $junitResponse.OuterXml
+$junitXml | Out-File "junit-results.xml" -Encoding UTF8
+############################################
+# PARSE AND PRINT RESULTS
+############################################
+[xml]$xmlDoc = $junitXml
+$testsuites = $xmlDoc.testsuites
+Write-Host "=== JUNIT SUMMARY ==="
+Write-Host "Playlist  : $($testsuites.name)"
+Write-Host "Tests     : $($testsuites.tests)"
+Write-Host "Failures  : $($testsuites.failures)"
+Write-Host "Errors    : $($testsuites.errors)"
+Write-Host "Disabled  : $($testsuites.disabled)"
+Write-Host "=== TEST CASE RESULTS ==="
+$testcases = $xmlDoc.SelectNodes("//testcase")
+foreach ($testcase in $testcases) {
+    $result = if ($testcase.failure) { "FAILED" } else { "PASSED" }
+    Write-Host "$($testcase.name): $result"
+}
+############################################
+# FAIL PIPELINE IF TESTS FAILED
+############################################
+if ([int]$testsuites.failures -gt 0 -or [int]$testsuites.errors -gt 0) {
+    throw "JUnit failures detected"
+}
+Write-Host "=== PIPELINE COMPLETED SUCCESSFULLY ==="
