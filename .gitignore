@@ -46,3 +46,14 @@ wp-config.php
 # Note: If you wish to whitelist themes,
 # uncomment the next line
 #/wp-content/themes
+
+node_modules/
+test-results/
+playwright-report/
+blob-report/
+results.xml
+playwright/.cache/
+.demo-chaos.json
+
+# Added by ggshield
+.cache_ggshield
