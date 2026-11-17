@@ -13,7 +13,7 @@ on:
 # Tosca Cloud's "Run GitHub Workflow" module dispatches without inputs, so the
 # tenant and space normally come from repository variables.
 env:
-  TOSCA_BASE_URL: "https://presales.my.tricentis.com/"
+  TOSCA_BASE_URL: "https://presales.my.tricentis.com"
 
   TOSCA_SPACE: "94fdbfd3-30fd-4487-bbf1-414a26c598a6"
 
@@ -44,7 +44,7 @@ jobs:
       - name: Upload results to Tosca Cloud
         run: >
           node upload.mjs
-          --base "https://presales.my.tricentis.com/"
+          --base "https://presales.my.tricentis.com"
           --space "94fdbfd3-30fd-4487-bbf1-414a26c598a6"
           --clientId "Tricentis_Cloud_API"
           --clientSecret "59KpIEYSVpf9eO4YSMUrzBqw4uxDPL8Vc7OJRty-pf0X-WJquMrAg71UZ9-t3CFV"
@@ -52,7 +52,7 @@ jobs:
           --zip blob-report/report.zip
         env:
           TOSCA_CLIENT_ID: "Tricentis_Cloud_API"
-          TOSCA_CLIENT_SECRET: 59KpIEYSVpf9eO4YSMUrzBqw4uxDPL8Vc7OJRty-pf0X-WJquMrAg71UZ9-t3CFV"
+          TOSCA_CLIENT_SECRET: "59KpIEYSVpf9eO4YSMUrzBqw4uxDPL8Vc7OJRty-pf0X-WJquMrAg71UZ9-t3CFV"
 
       - name: Publish JUnit results
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
