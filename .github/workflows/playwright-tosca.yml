@@ -43,10 +43,10 @@ jobs:
       - name: Upload results to Tosca Cloud
         run: >
           node upload.mjs
-          --base "$TOSCA_BASE_URL"
-          --space "$TOSCA_SPACE"
-          --clientId "$TOSCA_CLIENT_ID"
-          --clientSecret "$TOSCA_CLIENT_SECRET"
+          --base "https://presales.my.tricentis.com/"
+          --space "94fdbfd3-30fd-4487-bbf1-414a26c598a6"
+          --clientId "Tricentis_Cloud_API"
+          --clientSecret "59KpIEYSVpf9eO4YSMUrzBqw4uxDPL8Vc7OJRty-pf0X-WJquMrAg71UZ9-t3CFV"
           --junit results.xml
           --zip blob-report/report.zip
         env:
